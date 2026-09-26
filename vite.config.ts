@@ -1,11 +1,12 @@
 import { defineConfig } from 'vite';
 
 export default defineConfig({
+  // Exact repository name aage aur piche slashes ke saath
+  base: '/CICD_workflow/',
   server: {
-    port: 3000, // Ab 'npm run dev' 5173 ki jagah 3000 par chalega
-    open: true,  // Dev server start hote hi browser auto-open ho jayega
+    port: 5173,
   },
   build: {
-    outDir: 'dist', // Production build files ko dist folder mein rakhega
+    outDir: 'dist',
   },
 });
