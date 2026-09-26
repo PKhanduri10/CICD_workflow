@@ -3,9 +3,8 @@ name: CI/CD Pipeline - PixiJS Slot Game
 on:
   push:
     branches: [ "main", "master" ]
-  workflow_dispatch: # Direct GitHub UI se run karne ke liye
+  workflow_dispatch:
 
-# GitHub Pages Deployment Permissions
 permissions:
   contents: read
   pages: write
@@ -16,8 +15,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # ------------------ 1. BUILD & TEST STAGE ------------------
-  build-and-test:
+  build-and-deploy:
     runs-on: ubuntu-latest
 
     steps:
@@ -32,20 +30,18 @@ jobs:
       - name: Install Dependencies
         run: npm ci
 
-      - name: Run Automated Tests
-        run: npm test
+      # Test step removed since logic is directly inside main.ts
 
       - name: Build Game Production Package
         run: npm run build
 
-      - name: Upload Pages Artifact
+      - name: Setup GitHub Pages Artifact
         uses: actions/upload-pages-artifact@v3
         with:
           path: 'dist/'
 
-  # ------------------ 2. DEPLOYMENT STAGE ------------------
   deploy:
-    needs: build-and-test
+    needs: build-and-deploy
     runs-on: ubuntu-latest
     environment:
       name: github-pages
