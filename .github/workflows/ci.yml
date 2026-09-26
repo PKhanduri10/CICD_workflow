@@ -1,33 +1,22 @@
-name: CI Pipeline Demonstration
+name: CI/CD Pipeline - PixiJS Slot Game
 
 on:
   push:
-    branches: [ "*" ]
-  pull_request:
-    branches: [ "main" ]
+    branches: [ "main", "master" ]
+  workflow_dispatch: # Direct GitHub UI se run karne ke liye
+
+# GitHub Pages Deployment Permissions
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check out repository code
-        uses: actions/checkout@v4
-
-      - name: Test Orchestration Step
-        run: echo "CI/CD Pipeline triggered successfully!"
-        # ------------------ CD STAGE ------------------
-  deploy:
-    needs: build-and-test
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4jobs:
-  # ------------------ CI STAGE ------------------
+  # ------------------ 1. BUILD & TEST STAGE ------------------
   build-and-test:
     runs-on: ubuntu-latest
 
@@ -49,12 +38,12 @@ jobs:
       - name: Build Game Production Package
         run: npm run build
 
-      - name: Setup GitHub Pages Artifact
+      - name: Upload Pages Artifact
         uses: actions/upload-pages-artifact@v3
         with:
           path: 'dist/'
 
-  # ------------------ CD STAGE ------------------
+  # ------------------ 2. DEPLOYMENT STAGE ------------------
   deploy:
     needs: build-and-test
     runs-on: ubuntu-latest
