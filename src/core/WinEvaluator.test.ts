@@ -1,74 +1,35 @@
-import { GAME_CONFIG, SymbolType } from '../config/SlotConfig';
+import { describe, it, expect } from 'vitest';
+import { WinEvaluator } from './WinEvaluator';
+import { SymbolType } from '../config/SlotConfig';
 
-export interface LineWin {
-  paylineId: number;
-  symbol: SymbolType;
-  matchCount: number;
-  payout: number;
-}
+describe('WinEvaluator Core Engine', () => {
+  it('should return isWin: false when no matching paylines exist', () => {
+    // Non-winning 3x3 matrix setup
+    const noWinMatrix: SymbolType[][] = [
+      ['SEVEN', 'CHERRY', 'BAR'],
+      ['BAR', 'SEVEN', 'CHERRY'],
+      ['CHERRY', 'BAR', 'SEVEN'],
+    ];
 
-export interface WinResult {
-  totalPayout: number;
-  lineWins: LineWin[];
-  isWin: boolean;
-}
+    const result = WinEvaluator.evaluate(noWinMatrix);
+    expect(result.isWin).toBe(false);
+    expect(result.totalPayout).toBe(0);
+    expect(result.lineWins.length).toBe(0);
+  });
 
-export class WinEvaluator {
-  public static evaluate(visibleMatrix: SymbolType[][]): WinResult {
-    if (GAME_CONFIG.evaluationMode === 'PAYLINES') {
-      return this.evaluatePaylines(visibleMatrix);
-    } else {
-      return this.evaluateWays(visibleMatrix);
-    }
-  }
+  it('should detect a winning payline across row 0 (Line 1 match)', () => {
+    // Horizontal match on row 0
+    const winningMatrix: SymbolType[][] = [
+      ['SEVEN', 'CHERRY', 'BAR'],
+      ['SEVEN', 'BAR', 'CHERRY'],
+      ['SEVEN', 'CHERRY', 'BAR'],
+    ];
 
-  private static evaluatePaylines(matrix: SymbolType[][]): WinResult {
-    const lineWins: LineWin[] = [];
-    let totalPayout = 0;
-
-    for (const payline of GAME_CONFIG.paylines) {
-      const lineSymbols: SymbolType[] = [];
-
-      for (let reelIdx = 0; reelIdx < GAME_CONFIG.reelsCount; reelIdx++) {
-        const rowIdx = payline.pattern[reelIdx];
-        lineSymbols.push(matrix[reelIdx][rowIdx]);
-      }
-
-      // Check left-to-right matching
-      const firstSymbol = lineSymbols[0];
-      let matchCount = 1;
-
-      for (let i = 1; i < lineSymbols.length; i++) {
-        if (lineSymbols[i] === firstSymbol || lineSymbols[i] === 'WILD') {
-          matchCount++;
-        } else {
-          break;
-        }
-      }
-
-      if (matchCount >= 3) {
-        const payout = GAME_CONFIG.paytable[firstSymbol]?.[matchCount] || 0;
-        if (payout > 0) {
-          lineWins.push({
-            paylineId: payline.id,
-            symbol: firstSymbol,
-            matchCount,
-            payout,
-          });
-          totalPayout += payout;
-        }
-      }
-    }
-
-    return { totalPayout, lineWins, isWin: totalPayout > 0 };
-  }
-
-  private static evaluateWays(matrix: SymbolType[][]): WinResult {
-    // 243 Ways / All Ways Win Evaluation Strategy
-    let totalPayout = 0;
-    const lineWins: LineWin[] = [];
-
-    // Ways calculation logic
-    return { totalPayout, lineWins, isWin: totalPayout > 0 };
-  }
-}
+    const result = WinEvaluator.evaluate(winningMatrix);
+    expect(result.isWin).toBe(true);
+    expect(result.totalPayout).toBeGreaterThan(0);
+    expect(result.lineWins.length).toBeGreaterThanOrEqual(1);
+    expect(result.lineWins[0].symbol).toBe('SEVEN');
+    expect(result.lineWins[0].matchCount).toBe(3);
+  });
+});
