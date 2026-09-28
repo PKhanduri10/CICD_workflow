@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { WinEvaluator } from './WinEvaluator';
+import { WinEvaluator } from './WinEvaluator.test';
 import { SymbolType } from '../config/SlotConfig';
 
 describe('Win Evaluator Engine', () => {

@@ -1,5 +1,5 @@
 import { ReelEngine } from "../core/ReelEngine";
-import { WinEvaluator } from "../core/WinEvaluator";
+import { WinEvaluator } from "../core/WinEvaluator.test";
 import { Game } from "../ui/Game";
 
 export class SlotEventHandler {
