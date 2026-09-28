@@ -4,13 +4,13 @@ import { SymbolType } from '../config/SlotConfig';
 
 describe('WinEvaluator Core Engine', () => {
   it('should return isWin: false when no matching paylines exist', () => {
-    // 5 reels x 3 rows grid setup
+    // Completely alternating matrix to ensure zero consecutive matches across any payline pattern
     const noWinMatrix: SymbolType[][] = [
       ['SEVEN', 'CHERRY', 'BAR'],
       ['BAR', 'SEVEN', 'CHERRY'],
-      ['CHERRY', 'BAR', 'SEVEN'],
-      ['BAR', 'CHERRY', 'SEVEN'],
       ['SEVEN', 'BAR', 'CHERRY'],
+      ['BAR', 'CHERRY', 'SEVEN'],
+      ['CHERRY', 'SEVEN', 'BAR'],
     ];
 
     const result = WinEvaluator.evaluate(noWinMatrix);
@@ -20,7 +20,6 @@ describe('WinEvaluator Core Engine', () => {
   });
 
   it('should detect a winning payline across row 0', () => {
-    // Top row all SEVENs match
     const winningMatrix: SymbolType[][] = [
       ['SEVEN', 'CHERRY', 'BAR'],
       ['SEVEN', 'BAR', 'CHERRY'],
