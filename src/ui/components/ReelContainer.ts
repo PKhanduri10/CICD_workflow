@@ -1,11 +1,12 @@
 import { Container, Graphics, Ticker } from 'pixi.js';
 import { GAME_CONFIG, SymbolType } from '../../config/SlotConfig';
 import { SymbolUI } from './Symbols';
+export type ReelState = 'STOPPED' | 'STARTING' | 'SPINNING' | 'STOPPING' | 'DECELERATING';
 
 export class ReelContainer extends Container {
- private reelColumns: Container[] = [];
-  private symbolMatrixUI: SymbolUI[][] = [];
-  private isSpinning: boolean = false;
+  private reels: Container[] = [];
+  public symbolMatrixUI: SymbolUI[][] = [];
+  public reelStates: ReelState[] = [];
 
   private symbolHeight: number = 90;
   private symbolWidth: number = 110;
@@ -19,107 +20,154 @@ export class ReelContainer extends Container {
     const totalCols = GAME_CONFIG.reelsCount;
     const totalRows = GAME_CONFIG.rowsCount;
 
-    // 1. Create Masking Frame so symbols scrolling outside grid are clipped
+    // Grid viewport mask
     const maskGraphic = new Graphics();
     maskGraphic.rect(0, 0, totalCols * this.symbolWidth, totalRows * this.symbolHeight).fill(0x000000);
     this.addChild(maskGraphic);
     this.mask = maskGraphic;
 
-    // 2. Build Reel Columns & Symbols
     for (let col = 0; col < totalCols; col++) {
-      const reelColumn = new Container();
-      reelColumn.x = col * this.symbolWidth;
-      this.addChild(reelColumn);
-      this.reelColumns.push(reelColumn);
+      const reel = new Container();
+      reel.x = col * this.symbolWidth;
+      this.addChild(reel);
+      this.reels.push(reel);
 
       this.symbolMatrixUI[col] = [];
+      this.reelStates[col] = 'STOPPED';
 
-      // Render visible symbols + 2 extra buffer symbols for smooth infinite loop scrolling
-      for (let row = 0; row < totalRows + 2; row++) {
+      // 3 visible rows + 3 buffer rows (total 6 per column) for continuous downward streaming
+      for (let row = 0; row < totalRows + 3; row++) {
         const symbol = new SymbolUI();
-        symbol.y = (row - 1) * this.symbolHeight; // Starts offset from top (-1)
-        reelColumn.addChild(symbol);
+        symbol.y = (row - 1) * this.symbolHeight;
+        reel.addChild(symbol);
 
-        if (row < totalRows) {
-          this.symbolMatrixUI[col][row] = symbol;
+        if (row >= 1 && row <= totalRows) {
+          this.symbolMatrixUI[col][row - 1] = symbol;
         }
       }
     }
   }
 
-  // Physical Smooth Reel Spin Animation Loop
-  public startSpinAnimation(targetMatrix: SymbolType[][], onComplete: () => void): void {
-    if (this.isSpinning) return;
-    this.isSpinning = true;
+  public renderMatrix(matrix: SymbolType[][]): void {
+    for (let col = 0; col < GAME_CONFIG.reelsCount; col++) {
+      for (let row = 0; row < GAME_CONFIG.rowsCount; row++) {
+        if (this.symbolMatrixUI[col] && this.symbolMatrixUI[col][row]) {
+          this.symbolMatrixUI[col][row].setSymbol(matrix[col][row]);
+        }
+      }
+    }
+  }
 
+  public startSpinAnimation(targetMatrix: SymbolType[][], onComplete: () => void): void {
     const totalCols = GAME_CONFIG.reelsCount;
     const totalRows = GAME_CONFIG.rowsCount;
+    let totalStopped = 0;
 
-    let completedCount = 0;
 
     for (let col = 0; col < totalCols; col++) {
-      const reelCol = this.reelColumns[col];
-      let speed = 35; // Initial spin speed (pixels per frame)
-      let stopping = false;
-      const staggerDelay = col * 300; // Staggered stop delay per reel (300ms)
+      const reelCol = this.reels[col];
+      this.reelStates[col] = 'STARTING';
+
+      const maxSpeed = 25;
+      const minStoppingSpeed = 6;
+      let currentSpeed = maxSpeed;
+
+      let targetQueue: SymbolType[] = [];
+      let targetIndex = 0;
+      const staggerDelay = col * 350;
 
       const spinTicker = (ticker: Ticker) => {
         const delta = ticker.deltaTime;
 
-        // Shift all symbols downward vertically
-        reelCol.children.forEach((child) => {
-          child.y += speed * delta;
+        if (this.reelStates[col] === 'STARTING') {
+          this.reelStates[col] = 'SPINNING';
+        }
 
-          // Recycle symbol to top when it moves beyond bottom viewport
-          if (child.y >= totalRows * this.symbolHeight) {
-            child.y -= (totalRows + 2) * this.symbolHeight;
-
-            // Assign random symbol while spinning fast
-            if (!stopping && child instanceof SymbolUI) {
-              const randomSymbol = GAME_CONFIG.symbols[Math.floor(Math.random() * GAME_CONFIG.symbols.length)];
-              child.setSymbol(randomSymbol);
-            }
-          }
-        });
-      };
-
-      // Register spin loop on PixiJS Ticker
-      Ticker.shared.add(spinTicker);
-
-      // Trigger Stopping Phase for this reel
-      setTimeout(() => {
-        stopping = true;
-
-        // Lock target symbols into exact position
-        for (let row = 0; row < totalRows; row++) {
-          if (this.symbolMatrixUI[col][row]) {
-            this.symbolMatrixUI[col][row].setSymbol(targetMatrix[col][row]);
+        // Deceleration Phase
+        if (this.reelStates[col] === 'STOPPING') {
+          if (currentSpeed > minStoppingSpeed) {
+            currentSpeed *= 0.84;
           }
         }
 
-        // Decelerate & Snap positions
-        const stopTimer = setInterval(() => {
-          speed *= 0.75; // Gradual slowdown
+        // Shift symbols downward
+        reelCol.children.forEach((child) => {
+          child.y += currentSpeed * delta;
 
-          if (speed < 2) {
-            clearInterval(stopTimer);
-            Ticker.shared.remove(spinTicker);
+          // Wrap around boundary check
+          if (child.y >= (totalRows + 1) * this.symbolHeight) {
+            child.y -= (totalRows + 3) * this.symbolHeight;
 
-            // Reset & Snap symbols to exact Y coordinates with small Bounce Effect
-            for (let row = 0; row < reelCol.children.length; row++) {
-              const child = reelCol.children[row];
-              const targetY = (row - 1) * this.symbolHeight;
-              child.y = targetY; // Snap to precise grid position
-            }
-
-            completedCount++;
-            if (completedCount === totalCols) {
-              this.isSpinning = false;
-              onComplete(); // All reels stopped
+            if (child instanceof SymbolUI) {
+              if (
+                (this.reelStates[col] === 'STOPPING' || this.reelStates[col] === 'DECELERATING') &&
+                targetIndex < targetQueue.length
+              ) {
+                child.setSymbol(targetQueue[targetIndex]);
+                targetIndex++;
+              } else {
+                const randomSym = GAME_CONFIG.symbols[Math.floor(Math.random() * GAME_CONFIG.symbols.length)];
+                child.setSymbol(randomSym);
+              }
             }
           }
-        }, 50);
-      }, 1200 + staggerDelay);
+        });
+
+        // Final Landing & Alignment Lock Phase
+        if (
+          (this.reelStates[col] === 'STOPPING' || this.reelStates[col] === 'DECELERATING') &&
+          targetIndex >= targetQueue.length
+        ) {
+          this.reelStates[col] = 'DECELERATING';
+          currentSpeed *= 0.78;
+
+          if (currentSpeed < 1.5) {
+            currentSpeed = 0;
+            this.reelStates[col] = 'STOPPED';
+            Ticker.shared.remove(spinTicker);
+
+            // FIX 1: Exact Y-Position Snapping to prevent misalignment
+            reelCol.children.forEach((child) => {
+              const nearestRow = Math.round(child.y / this.symbolHeight);
+              child.y = nearestRow * this.symbolHeight;
+            });
+
+            // FIX 2: Sort children by exact position and map to visible viewport
+            const childrenSorted = [...reelCol.children].sort((a, b) => a.y - b.y);
+
+            for (let row = 0; row < totalRows; row++) {
+              // Index offset adjusted for top buffer symbol (row + 1)
+              const visibleChild = childrenSorted[row + 1];
+              if (visibleChild instanceof SymbolUI) {
+                this.symbolMatrixUI[col][row] = visibleChild;
+              }
+            }
+
+            // FIX 3: Global callback trigger when ALL reels stop
+            totalStopped++;
+            if (totalStopped === totalCols) {
+              onComplete();
+            }
+          }
+        }
+      };
+
+      Ticker.shared.add(spinTicker);
+
+      // Trigger Stopping Phase
+      setTimeout(() => {
+        targetQueue = [];
+
+        // Load symbols from top row to bottom row for natural downward entry
+        for (let row = 0; row < totalRows; row++) {
+          targetQueue.push(targetMatrix[col][row]);
+        }
+
+        // Buffer symbol for seamless wrap-around top padding
+        targetQueue.push(GAME_CONFIG.symbols[Math.floor(Math.random() * GAME_CONFIG.symbols.length)]);
+
+        this.reelStates[col] = 'STOPPING';
+      }, 900 + staggerDelay);
     }
   }
 }

@@ -3,7 +3,7 @@ import { ReelContainer } from '../components/ReelContainer';
 import { ButtonUI } from '../components/ButtonContainer';
 import { BackgroundUI } from '../components/GameBackground';
 
-export class MainContainerUI extends Container {
+export class GameContainer extends Container {
   public backgroundLayer: Container;
   public reelsLayer: Container;
   public uiLayer: Container;

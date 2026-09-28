@@ -1,5 +1,4 @@
 import { Container, Graphics, Text, TextStyle } from 'pixi.js';
-import { GAME_CONFIG, SymbolType } from '../../config/SlotConfig';
 
 export class BackgroundUI extends Container {
   constructor() {
@@ -16,7 +15,7 @@ export class BackgroundUI extends Container {
 
   private createHeader(): void {
     const title = new Text({
-      text: `🎰 ${GAME_CONFIG.reelsCount}x${GAME_CONFIG.rowsCount} Slot Engine 🎰`,
+      text: `Base Game`,
       style: new TextStyle({ fontSize: 32, fill: '#ffffff', fontWeight: 'bold' }),
     });
     title.x = 220;

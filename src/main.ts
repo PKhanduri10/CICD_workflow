@@ -1,13 +1,18 @@
+import { Application } from "pixi.js";
 import { SlotEventHandler } from "./events/SlotEventHandler";
-import { SlotUI } from "./ui/SlotUI";
+import { Game } from "./ui/Game";
 
 async function initApplication(): Promise<void> {
   // Initialize PixiJS View Layer
-  const ui = new SlotUI();
-  await ui.init();
+  const app = new Application();
+  await app.init({ width: 900, height: 600 });
+  document.body.appendChild(app.canvas);
+
+  const game = new Game();
+  game.init(app.stage);
 
   // Attach Event Controller to UI
-  new SlotEventHandler(ui);
+  new SlotEventHandler(game);
 
   console.log('🎰 Slot Game Initialized Successfully!');
 }
