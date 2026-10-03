@@ -1,74 +1,75 @@
 import { GAME_CONFIG, SymbolType } from '../config/SlotConfig';
 
 export interface LineWin {
-  paylineId: number;
+  lineIndex: number;
   symbol: SymbolType;
   matchCount: number;
-  payout: number;
+  payoutMultiplier: number;
+  paylinePositions: number[];
 }
 
 export interface WinResult {
+  isWin: boolean;
   totalPayout: number;
   lineWins: LineWin[];
-  isWin: boolean;
 }
 
 export class WinEvaluator {
-  public static evaluate(visibleMatrix: SymbolType[][]): WinResult {
-    if (GAME_CONFIG.evaluationMode === 'PAYLINES') {
-      return this.evaluatePaylines(visibleMatrix);
-    } else {
-      return this.evaluateWays(visibleMatrix);
-    }
-  }
-
-  private static evaluatePaylines(matrix: SymbolType[][]): WinResult {
+  public static evaluate(matrix: SymbolType[][]): WinResult {
     const lineWins: LineWin[] = [];
     let totalPayout = 0;
 
-    for (const payline of GAME_CONFIG.paylines) {
+    const paylines = GAME_CONFIG.paylines;
+    const paytable = GAME_CONFIG.paytable;
+
+    paylines.forEach((payline, lineIndex) => {
+      // Support both array pattern or object with pattern property
+      const pattern: number[] = Array.isArray(payline) ? payline : (payline as any).pattern;
+      if (!pattern) return;
+
       const lineSymbols: SymbolType[] = [];
 
-      for (let reelIdx = 0; reelIdx < GAME_CONFIG.reelsCount; reelIdx++) {
-        const rowIdx = payline.pattern[reelIdx];
-        lineSymbols.push(matrix[reelIdx][rowIdx]);
+      for (let colIdx = 0; colIdx < pattern.length; colIdx++) {
+        const rowIdx = pattern[colIdx];
+        
+        // Bounds check to prevent reading undefined
+        if (matrix[colIdx] && matrix[colIdx][rowIdx] !== undefined) {
+          lineSymbols.push(matrix[colIdx][rowIdx]);
+        }
       }
 
-      // Check left-to-right matching
+      if (lineSymbols.length === 0) return;
+
       const firstSymbol = lineSymbols[0];
       let matchCount = 1;
 
       for (let i = 1; i < lineSymbols.length; i++) {
-        if (lineSymbols[i] === firstSymbol || lineSymbols[i] === 'WILD') {
+        if (lineSymbols[i] === firstSymbol) {
           matchCount++;
         } else {
           break;
         }
       }
 
-      if (matchCount >= 3) {
-        const payout = GAME_CONFIG.paytable[firstSymbol]?.[matchCount] || 0;
-        if (payout > 0) {
-          lineWins.push({
-            paylineId: payline.id,
-            symbol: firstSymbol,
-            matchCount,
-            payout,
-          });
-          totalPayout += payout;
-        }
+      const symbolPayouts = paytable[firstSymbol];
+      if (symbolPayouts && symbolPayouts[matchCount] && symbolPayouts[matchCount] > 0) {
+        const payoutMultiplier = symbolPayouts[matchCount];
+        totalPayout += payoutMultiplier;
+
+        lineWins.push({
+          lineIndex,
+          symbol: firstSymbol,
+          matchCount,
+          payoutMultiplier,
+          paylinePositions: pattern,
+        });
       }
-    }
+    });
 
-    return { totalPayout, lineWins, isWin: totalPayout > 0 };
-  }
-
-  private static evaluateWays(matrix: SymbolType[][]): WinResult {
-    // 243 Ways / All Ways Win Evaluation Strategy
-    let totalPayout = 0;
-    const lineWins: LineWin[] = [];
-
-    // Ways calculation logic
-    return { totalPayout, lineWins, isWin: totalPayout > 0 };
+    return {
+      isWin: lineWins.length > 0,
+      totalPayout,
+      lineWins,
+    };
   }
 }

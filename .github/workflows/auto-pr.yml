@@ -1,0 +1,66 @@
+name: CI & Auto Create PR
+
+on:
+  push:
+    branches-ignore:
+      - main # Trigger on any branch push except main
+
+jobs:
+  # 1. CI Job: Run Tests & Build Validation First
+  test-and-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run Vitest Unit Tests
+        run: npm test -- --run
+
+      - name: Build Game Production Package
+        run: npm run build
+
+  # 2. Auto-PR Job: Only executes IF test-and-build passes completely
+  create-pr:
+    needs: test-and-build # GATEKEEPER: Strict dependency on test-and-build job passing
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check existing PR & Create PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          BRANCH_NAME="${GITHUB_REF#refs/heads/}"
+          
+          # Check if a PR already exists for this source branch
+          PR_EXISTS=$(gh pr list --head "$BRANCH_NAME" --json number -q '.[0].number')
+          
+          if [ -z "$PR_EXISTS" ]; then
+            echo "Build & Tests PASSED! Creating Pull Request for: $BRANCH_NAME"
+            gh pr create \
+              --base main \
+              --head "$BRANCH_NAME" \
+              --title "auto(pr): $BRANCH_NAME -> main" \
+              --body "## Automated PR (Build & CI Passed ✅)
+              
+              This PR was automatically created because all unit tests and Vite production builds passed successfully on branch push.
+              
+              - **Source Branch:** \`$BRANCH_NAME\`
+              - **Target Branch:** \`main\`
+              - **CI Status:** Passed ✅"
+          else
+            echo "PR #${PR_EXISTS} already exists for branch$BRANCH_NAME. Skipping creation."
+          fi
